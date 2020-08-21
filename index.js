@@ -9,7 +9,7 @@ const gdi32 = require('./gdi32');
 const config = require('./config.json');
 const credentials = require('./credentials.json');
 
-execFile('C:\\全能行证券交易终端\\xiadan.exe');
+execFile(config.execFilePath);
 login();
 
 async function login() {
@@ -87,15 +87,18 @@ function click(hwnd) {
   user32.SendMessageW(hwnd, BM_CLICK, 0, 0);
 }
 
-async function getCaptcha(hWnd) {
-  const rect = new Struct(DS.RECT)();
-  user32.GetWindowRect(hWnd, rect.ref());
-  console.log('rect', rect.left, rect.right, rect.top, rect.bottom);
+async function getCaptcha(hwnd) {
+  screenshot(hwnd, 'captcha.bmp');
+  const text = await require("node-tesseract-ocr").recognize('captcha.bmp', { lang: 'eng', oem: 1, psm: 3 })
+  console.log('ocr result', text);
+  const captcha = text.trim();
+  return captcha;
+}
 
-  const width = rect.right - rect.left - 13;
-  const height = rect.bottom - rect.top;
+function screenshot(hwnd, filePath) {
+  const { width, height } = getWindowSize(hwnd);
 
-  const hdcFrom = user32e.GetDC(hWnd);
+  const hdcFrom = user32e.GetDC(hwnd);
   const hdcTo = gdi32.CreateCompatibleDC(hdcFrom);
   const hBitmap = gdi32.CreateCompatibleBitmap(hdcFrom, width, height);
   const hLocalBitmap = gdi32.SelectObject(hdcTo, hBitmap);
@@ -103,31 +106,18 @@ async function getCaptcha(hWnd) {
   gdi32.BitBlt(hdcTo, 0, 0, width, height, hdcFrom, 0, 0, SRCCOPY);
   gdi32.SelectObject(hdcTo, hLocalBitmap);
   gdi32.DeleteDC(hdcTo);
-  user32e.ReleaseDC(hWnd, hdcFrom);
+  user32e.ReleaseDC(hwnd, hdcFrom);
 
   const bytes = (width * height) * 4;
   const bmpBuf = Buffer.alloc(bytes);
   gdi32.GetBitmapBits(hBitmap, bytes, bmpBuf);
   gdi32.DeleteObject(hBitmap);
 
-  const imgBuf = require('image-encode')(bmpBuf, [width, height], 'bmp');
-  require('fs').writeFileSync('captcha.bmp', Buffer.from(imgBuf));
-
-  const text = await require("node-tesseract-ocr").recognize('captcha.bmp', { lang: 'eng', oem: 1, psm: 3 })
-  console.log('ocr', text);
-
-  const captcha = text.trim();
-  if (!captcha) return await getCaptcha(hWnd);
-  return captcha;
+  saveBmp(bmpBuf, width, height, filePath);
 }
 
-async function getCaptcha2(hWnd) {
-  const rect = new Struct(DS.RECT)();
-  user32.GetWindowRect(hWnd, rect.ref());
-  console.log('rect', rect.left, rect.right, rect.top, rect.bottom);
-
-  const width = rect.right - rect.left - 13;
-  const height = rect.bottom - rect.top;
+async function screenshot2(hwnd, filePath) {
+  const { width, height } = getWindowSize(hwnd);
 
   const hdc = user32e.GetDC(hWnd);
   const hdcMem = gdi32.CreateCompatibleDC(hdc);
@@ -144,13 +134,21 @@ async function getCaptcha2(hWnd) {
   gdi32.DeleteObject(hdcMem);
   user32e.ReleaseDC(hWnd, hdc);
 
-  const imgBuf = require('image-encode')(bmpBuf, [width, height], 'bmp');
-  require('fs').writeFileSync('captcha.bmp', Buffer.from(imgBuf));
+  saveBmp(bmpBuf, width, height, filePath);
+}
 
-  const text = await require("node-tesseract-ocr").recognize('captcha.bmp', { lang: 'eng', oem: 1, psm: 3 })
-  console.log('ocr', text);
+function getWindowSize(hwnd) {
+  const rect = new Struct(DS.RECT)();
+  user32.GetWindowRect(hwnd, rect.ref());
+  console.log('rect', rect.left, rect.right, rect.top, rect.bottom);
 
-  const captcha = text.trim();
-  // if (!captcha) return await getCaptcha2(hWnd);
-  return captcha;
+  const width = rect.right - rect.left - 13;
+  const height = rect.bottom - rect.top;
+
+  return { width, height };
+}
+
+function saveBmp(buf, width, height, filePath) {
+  const imgBuf = require('image-encode')(buf, [width, height], 'bmp');
+  require('fs').writeFileSync(filePath, Buffer.from(imgBuf));
 }
