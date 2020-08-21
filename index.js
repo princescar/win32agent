@@ -6,23 +6,13 @@ const Struct = StructDi(ref);
 const user32 = U.load();
 const user32e = require('./user32e');
 const gdi32 = require('./gdi32');
-const config = require('./config.json');
-const credentials = require('./credentials.json');
 
-execFile(config.execFilePath);
-login();
+test();
 
-async function login() {
-  const window = await findWindow(config.loginWindowText);
-  const controls = getControls(window, config.loginControlIndices);
-
-  input(controls.account, credentials.account);
-  await delay(100);
-  input(controls.password, credentials.password);
-  const captcha = await getCaptcha(controls.captchaImage);
-  input(controls.captcha, captcha);
-
-  click(controls.submit);
+async function test() {
+  const window = await findWindow('计算器');
+  screenshot(window, 'calc.bmp');
+  screenshot2(window, 'calc2.bmp');
 }
 
 async function findWindow(title) {
@@ -49,52 +39,6 @@ function strBuf(str) {
   return Buffer.from(str + '\0', 'ucs2');
 }
 
-function getControls(hwnd, indices) {
-  const GW_CHILD = 5;
-  const GW_HWNDNEXT = 2;
-
-  const controls = {};
-
-  const map = [];
-  for (let key in indices) {
-    map[indices[key]] = key;
-  }
-
-  let childhwnd = user32.GetWindow(hwnd, GW_CHILD);
-  let index = 0;
-  while (isValidHandle(childhwnd)) {
-    if (map[index]) {
-      controls[map[index]] = childhwnd;
-      console.log(map[index], childhwnd.toString(16));
-    }
-    childhwnd = user32.GetWindow(childhwnd, GW_HWNDNEXT);
-    index++;
-  }
-
-  return controls;
-}
-
-function input(hwnd, text) {
-  user32.SendMessageW(hwnd, CS.WM_SETTEXT, 0, ref.address(strBuf(text)));
-}
-
-async function delay(milliseconds) {
-  return new Promise(resolve => setTimeout(resolve, milliseconds));
-}
-
-function click(hwnd) {
-  const BM_CLICK = 0x00F5;
-  user32.SendMessageW(hwnd, BM_CLICK, 0, 0);
-}
-
-async function getCaptcha(hwnd) {
-  screenshot(hwnd, 'captcha.bmp');
-  const text = await require("node-tesseract-ocr").recognize('captcha.bmp', { lang: 'eng', oem: 1, psm: 3 })
-  console.log('ocr result', text);
-  const captcha = text.trim();
-  return captcha;
-}
-
 function screenshot(hwnd, filePath) {
   const { width, height } = getWindowSize(hwnd);
 
@@ -119,11 +63,11 @@ function screenshot(hwnd, filePath) {
 async function screenshot2(hwnd, filePath) {
   const { width, height } = getWindowSize(hwnd);
 
-  const hdc = user32e.GetDC(hWnd);
+  const hdc = user32e.GetDC(hwnd);
   const hdcMem = gdi32.CreateCompatibleDC(hdc);
   const hbitmap = gdi32.CreateCompatibleBitmap(hdc, width, height);
   gdi32.SelectObject(hdcMem, hbitmap);
-  user32.PrintWindow(hWnd, hdcMem, 0);
+  user32.PrintWindow(hwnd, hdcMem, 0);
 
   const bytes = (width * height) * 4;
   const bmpBuf = Buffer.alloc(bytes);
@@ -132,7 +76,7 @@ async function screenshot2(hwnd, filePath) {
 
   gdi32.DeleteObject(hbitmap);
   gdi32.DeleteObject(hdcMem);
-  user32e.ReleaseDC(hWnd, hdc);
+  user32e.ReleaseDC(hwnd, hdc);
 
   saveBmp(bmpBuf, width, height, filePath);
 }
@@ -142,7 +86,7 @@ function getWindowSize(hwnd) {
   user32.GetWindowRect(hwnd, rect.ref());
   console.log('rect', rect.left, rect.right, rect.top, rect.bottom);
 
-  const width = rect.right - rect.left - 13;
+  const width = rect.right - rect.left;
   const height = rect.bottom - rect.top;
 
   return { width, height };
