@@ -1,0 +1,10 @@
+{
+  "loginWindowText": "用户登录",
+  "loginControlIndices": {
+    "account": 0,
+    "password": 1,
+    "captcha": 6,
+    "captchaImage": 7,
+    "submit": 9
+  }
+}
