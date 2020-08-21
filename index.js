@@ -19,6 +19,7 @@ async function login() {
   input(controls.account, credentials.account);
   await delay(100);
   input(controls.password, credentials.password);
+  await delay(1000);
   const captcha = await getCaptcha(controls.captchaImage);
   input(controls.captcha, captcha);
 
@@ -119,11 +120,11 @@ function screenshot(hwnd, filePath) {
 async function screenshot2(hwnd, filePath) {
   const { width, height } = getWindowSize(hwnd);
 
-  const hdc = user32e.GetDC(hWnd);
+  const hdc = user32e.GetDC(hwnd);
   const hdcMem = gdi32.CreateCompatibleDC(hdc);
   const hbitmap = gdi32.CreateCompatibleBitmap(hdc, width, height);
   gdi32.SelectObject(hdcMem, hbitmap);
-  user32.PrintWindow(hWnd, hdcMem, 0);
+  user32.PrintWindow(hwnd, hdcMem, 0);
 
   const bytes = (width * height) * 4;
   const bmpBuf = Buffer.alloc(bytes);
@@ -132,7 +133,7 @@ async function screenshot2(hwnd, filePath) {
 
   gdi32.DeleteObject(hbitmap);
   gdi32.DeleteObject(hdcMem);
-  user32e.ReleaseDC(hWnd, hdc);
+  user32e.ReleaseDC(hwnd, hdc);
 
   saveBmp(bmpBuf, width, height, filePath);
 }
